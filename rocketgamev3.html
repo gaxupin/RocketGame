@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Cohete Espacial</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: url('./fondo4.png') no-repeat center center fixed;
+            background-size: cover;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        #menu, #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #menu button, #gameOver button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h1>Juego de Cohete Espacial</h1>
+        <button onclick="startGame()">Iniciar Juego</button>
+    </div>
+    <div id="gameOver" style="display: none;">
+        <h1>¡Juego Terminado!</h1>
+        <p id="finalScore"></p>
+        <button onclick="resetGame()">Reiniciar Juego</button>
+    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const rocketImg = new Image();
+        rocketImg.src = './rocketicon.png';
+
+        const planetImages = ['./jupiter.png', './tierra.png', './saturno.png'];
+        const powerUpImg = new Image();
+        powerUpImg.src = './rocket.png';
+
+        let planets = [];
+        let powerUps = [];
+        const planetCount = 5;
+        let score = 0;
+        let level = 1;
+        let gameRunning = false;
+
+        const rocket = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 40,
+            dx: 0,
+            dy: 0,
+            speed: 4,
+            lives: 3,
+            invulnerable: false
+        };
+
+        function createPlanets() {
+            planets = [];
+            for (let i = 0; i < planetCount + level; i++) {
+                const img = new Image();
+                img.src = planetImages[Math.floor(Math.random() * planetImages.length)];
+                planets.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: 50 + Math.random() * 30,
+                    dx: (Math.random() - 0.5) * 2,
+                    dy: (Math.random() - 0.5) * 2,
+                    img: img
+                });
+            }
+        }
+
+        function createPowerUps() {
+            powerUps = [];
+            for (let i = 0; i < 3; i++) {
+                powerUps.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: 30,
+                    collected: false
+                });
+            }
+        }
+
+        function drawRocket() {
+            ctx.drawImage(rocketImg, rocket.x, rocket.y, rocket.size, rocket.size);
+        }
+
+        function drawPlanets() {
+            planets.forEach(planet => {
+                ctx.drawImage(planet.img, planet.x, planet.y, planet.size, planet.size);
+            });
+        }
+
+        function drawPowerUps() {
+            powerUps.forEach(powerUp => {
+                if (!powerUp.collected) {
+                    ctx.drawImage(powerUpImg, powerUp.x, powerUp.y, powerUp.size, powerUp.size);
+                }
+            });
+        }
+
+        function updateRocket() {
+            rocket.x += rocket.dx;
+            rocket.y += rocket.dy;
+
+            if (rocket.x < 0) rocket.x = 0;
+            if (rocket.x + rocket.size > canvas.width) rocket.x = canvas.width - rocket.size;
+            if (rocket.y < 0) rocket.y = 0;
+            if (rocket.y + rocket.size > canvas.height) rocket.y = canvas.height - rocket.size;
+        }
+
+        function updatePlanets() {
+            planets.forEach(planet => {
+                planet.x += planet.dx;
+                planet.y += planet.dy;
+
+                if (planet.x < 0 || planet.x > canvas.width) planet.dx *= -1;
+                if (planet.y < 0 || planet.y > canvas.height) planet.dy *= -1;
+            });
+        }
+
+        function checkCollision() {
+            planets.forEach(planet => {
+                const distX = rocket.x - planet.x;
+                const distY = rocket.y - planet.y;
+                const distance = Math.sqrt(distX * distX + distY * distY);
+
+                if (distance < rocket.size + planet.size && !rocket.invulnerable) {
+                    rocket.lives--;
+                    if (rocket.lives <= 0) {
+                        endGame();
+                    } else {
+                        rocket.x = canvas.width / 2;
+                        rocket.y = canvas.height / 2;
+                        createPlanets();
+                    }
+                }
+            });
+
+            powerUps.forEach(powerUp => {
+                const distX = rocket.x - powerUp.x;
+                const distY = rocket.y - powerUp.y;
+                const distance = Math.sqrt(distX * distX + distY * distY);
+
+                if (distance < rocket.size + powerUp.size && !powerUp.collected) {
+                    powerUp.collected = true;
+                    rocket.invulnerable = true;
+                    setTimeout(() => rocket.invulnerable = false, 5000);
+                }
+            });
+        }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function drawScore() {
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.fillText('Puntuación: ' + score, 10, 20);
+            ctx.fillText('Nivel: ' + level, 10, 50);
+        }
+
+        function drawLives() {
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.fillText('Vidas: ' + rocket.lives, canvas.width - 100, 20);
+        }
+
+        function gameLoop() {
+            if (gameRunning) {
+                clearCanvas();
+                drawRocket();
+                drawPlanets();
+                drawPowerUps();
+                updateRocket();
+                updatePlanets();
+                checkCollision();
+                drawScore();
+                drawLives();
+                score++;
+                if (score % 1000 === 0) {
+                    level++;
+                    createPlanets();
+                }
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function moveRocket(e) {
+            switch (e.key) {
+                case 'ArrowUp':
+                    rocket.dy = -rocket.speed;
+                    break;
+                case 'ArrowDown':
+                    rocket.dy = rocket.speed;
+                    break;
+                case 'ArrowLeft':
+                    rocket.dx = -rocket.speed;
+                    break;
+                case 'ArrowRight':
+                    rocket.dx = rocket.speed;
+                    break;
+            }
+        }
+
+        function stopRocket(e) {
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'ArrowDown':
+                    rocket.dy = 0;
+                    break;
+                case 'ArrowLeft':
+                case 'ArrowRight':
+                    rocket.dx = 0;
+                    break;
+            }
+        }
+
+        function startGame() {
+            document.getElementById('menu').style.display = 'none';
+            gameRunning = true;
+            resetGame();
+            gameLoop();
+        }
+
+        function endGame() {
+            gameRunning = false;
+            document.getElementById('finalScore').innerText = 'Puntuación Final: ' + score;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+
+        function resetGame() {
+            rocket.x = canvas.width / 2;
+            rocket.y = canvas.height / 2;
+            rocket.lives = 3;
+            score = 0;
+            level = 1;
+            createPlanets();
+            createPowerUps();
+            document.getElementById('gameOver').style.display = 'none';
+        }
+
+        document.addEventListener('keydown', moveRocket);
+        document.addEventListener('keyup', stopRocket);
+
+        resetGame();
+    </script>
+</body>
+</html>
